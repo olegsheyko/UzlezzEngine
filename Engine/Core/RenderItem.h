@@ -1,0 +1,36 @@
+#pragma once
+#include "d3dApp.h"
+
+using namespace DirectX;
+using namespace DirectX::PackedVector;
+
+struct RenderItem
+{
+    RenderItem() = default;
+    RenderItem(const RenderItem& rhs) = delete;
+
+    XMFLOAT4X4 World = MathHelper::Identity4x4();
+    XMMATRIX ScaleM = XMMatrixIdentity();
+    XMMATRIX RotationM = XMMatrixIdentity();
+    XMMATRIX TranslationM = XMMatrixIdentity();
+    
+    XMFLOAT3 Position = XMFLOAT3(0.0f, 0.0f, 2.0f);
+    XMFLOAT3 RotationAngle = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    XMFLOAT3 Scale = XMFLOAT3(1.0f, 1.0f, 1.0f);
+
+    XMFLOAT4X4 TexTransform = MathHelper::Identity4x4();
+
+    int NumFramesDirty = gNumFrameResources;
+
+    UINT ObjCBIndex = -1;
+
+    Material* Mat = nullptr;
+    MeshGeometry* Geo = nullptr;
+
+    D312_PRIMITIVE_TOPOLOGY PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+
+    UINT IndexCount = 0;
+    UINT StartIndexLocation = 0;
+    int BaseVertexLocation = 0;
+    std::string Name = "model";
+};
