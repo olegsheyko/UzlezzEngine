@@ -27,7 +27,7 @@ struct RenderItem
     Material* Mat = nullptr;
     MeshGeometry* Geo = nullptr;
 
-    D312_PRIMITIVE_TOPOLOGY PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    D3D12_PRIMITIVE_TOPOLOGY PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
     UINT IndexCount = 0;
     UINT StartIndexLocation = 0;

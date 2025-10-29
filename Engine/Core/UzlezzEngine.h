@@ -8,8 +8,8 @@
 #include "FrameResource.h"
 #include <iostream>
 #include "RenderItem.h"
-#include "TerrainSystem.h"
-#include "NoiseGeneration.h"
+#include "TerrainSystem/TerrainSystem.h"
+//#include "NoiseGeneration.h"
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -32,6 +32,7 @@ public:
 private:
 	virtual void OnResize()override;
 	virtual void Update(const GameTimer& gt)override;
+	virtual void Draw(const GameTimer& gt)override;
 	virtual void DeferredDraw(const GameTimer& gt)override;
 	virtual void OnMouseDown(WPARAM btnState, int x, int y)override;
 	virtual void OnMouseUp(WPARAM btnState, int x, int y)override;
@@ -163,7 +164,7 @@ private:
 	std::vector<TerrainTile*> m_visibleTerrainTiles;
 	float heightScale = 100;
 	ComPtr<ID3D12Resource> m_generatedHeightMap;
-	NoiseGenerator noiseGen;
+	//NoiseGenerator noiseGen;
 	// ������
 	void GenerateTileGeometry(const XMFLOAT3& worldPos, float tileSize, int lodLevel, std::vector<Vertex>& vertices, std::vector<std::uint32_t>& indices);
 	void BuildTerrainGeometry();

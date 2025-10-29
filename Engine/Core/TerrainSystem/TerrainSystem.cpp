@@ -1,9 +1,5 @@
 #include "TerrainSystem.h"
 
-bool AABB::IntersectsFrustum(const XMFLOAT4 frustumPlanes[6]) const
-{
-}
-
 bool QuadTreeNode::ShouldSplit(const XMFLOAT3& cameraPos, float heightscale, int mapsize) const
 {
     auto camPos = cameraPos;

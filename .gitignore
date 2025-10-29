@@ -40,6 +40,13 @@ bld/
 # Visual Studio 2017 auto generated files
 Generated\ Files/
 
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# Plugins
+GhostTextManager_v2.xml
+
 # MSTest test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
