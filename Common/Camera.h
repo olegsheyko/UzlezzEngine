@@ -66,7 +66,7 @@ public:
 	void Walk(float d);
 
 	void AddSpeed(float alpha);
-	float GetSpeed();
+	float& GetSpeed();
 	void SetSpeed(float _speed);
 	void IncreaseSpeed(float delta);
 	// Rotate the camera.

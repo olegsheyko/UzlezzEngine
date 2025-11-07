@@ -57,6 +57,17 @@ struct Vertex
     Vertex() {};
 };
 
+struct TerrainTileConstants
+{
+    DirectX::XMFLOAT3 TilePosition;
+    float TileSize;
+    float mapSize;
+    float hScale;
+    float showborders = 1;
+    float debugMode = 1;
+    float renderHMAP = 0;
+};
+
 // Stores the resources needed for the CPU to build the command lists
 // for a frame.  
 struct FrameResource
@@ -80,6 +91,7 @@ public:
     std::unique_ptr<UploadBuffer<ObjectConstants>> ObjectCB = nullptr;
     std::unique_ptr<UploadBuffer<LightConstants>> LightCB = nullptr;
     std::unique_ptr<UploadBuffer<PassShadowConstants>> PassShadowCB = nullptr;
+    std::unique_ptr<UploadBuffer<TerrainTileConstants>> TerrainCB = nullptr;
     // Fence value to mark commands up to this fence point.  This lets us
     // check if these frame resources are still in use by the GPU.
     UINT64 Fence = 0;

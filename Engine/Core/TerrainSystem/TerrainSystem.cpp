@@ -61,7 +61,7 @@ void TerrainSystem::Update(const XMFLOAT3& cameraPos, BoundingFrustum& frustum)
         m_rootNode->UpdateVisibility(frustum, cameraPos, m_visibleTiles, m_heightScale, (int)m_worldSize);
 }
 
-std::vector<std::unique_ptr<TerrainTile>>& TerrainSystem::GetAllTiles()
+std::vector<std::shared_ptr<TerrainTile>>& TerrainSystem::GetAllTiles()
 {
     return m_allTiles;
 }

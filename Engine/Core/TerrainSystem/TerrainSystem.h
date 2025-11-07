@@ -22,7 +22,7 @@ struct TerrainTile
     bool isVisible = true;
     int tileIndex;
     int renderItemIndex;
-    int NunFramesDirty;
+    int NumFramesDirty;
 };
 
 struct QuadTreeNode
@@ -45,7 +45,7 @@ public:
     void Initialize(ID3D12Device* device, int HeightMapIndex, std::string hmapname,
         float worldSize, int maxLOD);
     void Update(const XMFLOAT3& cameraPos, BoundingFrustum& frustum);
-    std::vector<std::unique_ptr<TerrainTile>>& GetAllTiles();
+    std::vector<std::shared_ptr<TerrainTile>>& GetAllTiles();
     void GetVisibleTiles(std::vector<TerrainTile*>& visibleTiles);
     float m_worldSize;
     int m_hmapIndex;
@@ -63,7 +63,7 @@ public:
 private:
     std::unique_ptr<QuadTreeNode> m_rootNode;
     ComPtr<ID3D12Resource> m_heightmapTexture;
-    std::vector<std::unique_ptr<TerrainTile>> m_allTiles;
+    std::vector<std::shared_ptr<TerrainTile>> m_allTiles;
     std::vector<TerrainTile*> m_visibleTiles;
     int m_maxLOD;
     int tileIndex = 0;
