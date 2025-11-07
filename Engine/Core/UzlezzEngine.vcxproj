@@ -174,6 +174,7 @@
     <ClCompile Include="..\..\Common\MathHelper.cpp" />
     <ClCompile Include="..\..\Common\model.cpp" />
     <ClCompile Include="FrameResource.cpp" />
+    <ClCompile Include="TerrainSystem\NoiseGeneration.cpp" />
     <ClCompile Include="TerrainSystem\TerrainSystem.cpp" />
     <ClCompile Include="UzlezzEngine.cpp" />
   </ItemGroup>
@@ -198,6 +199,7 @@
     <ClInclude Include="..\..\Common\UploadBuffer.h" />
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="RenderItem.h" />
+    <ClInclude Include="TerrainSystem\NoiseGeneration.h" />
     <ClInclude Include="TerrainSystem\TerrainSystem.h" />
     <ClInclude Include="UzlezzEngine.h" />
   </ItemGroup>

@@ -250,35 +250,35 @@ void Camera::Yaw(float angle)
 
 void Camera::YawPitch(float yawDelta, float pitchDelta)
 {
-	// 1. Аккумулируем изменения углов.
+	// 1. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ.
 	mYaw += yawDelta;
 	mPitch += pitchDelta;
 
-	// 2. Ограничиваем угол наклона (pitch) примерно ±89 градусов.
-	float pitchLimit = XM_PIDIV2 - 0.01f; // XM_PIDIV2 = 90 градусов, отступ чуть меньше, чтобы избежать гима.
+	// 2. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ (pitch) пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ89 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+	float pitchLimit = XM_PIDIV2 - 0.01f; // XM_PIDIV2 = 90 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ.
 	if (mPitch > pitchLimit)
 		mPitch = pitchLimit;
 	if (mPitch < -pitchLimit)
 		mPitch = -pitchLimit;
 
-	// 3. Пересчитываем ориентацию камеры как кватернион из накопленных углов (без учета крена).
+	// 3. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ).
 	XMVECTOR q = XMQuaternionRotationRollPitchYaw(mPitch, mYaw, 0.0f);
 	XMStoreFloat4(&orientation, q);
 
-	// 4. Вычисляем новый вектор взгляда.
+	// 4. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
 	XMVECTOR baseForward = XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
 	XMVECTOR newForward = XMVector3Rotate(baseForward, q);
 	newForward = XMVector3Normalize(newForward);
 	XMStoreFloat3(&mLook, newForward);
 
-	// 5. Вычисляем правый и верхний векторы камеры.
+	// 5. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ.
 	XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 	XMVECTOR newRight = XMVector3Normalize(XMVector3Cross(worldUp, newForward));
 	XMStoreFloat3(&mRight, newRight);
 	XMVECTOR newUp = XMVector3Normalize(XMVector3Cross(newForward, newRight));
 	XMStoreFloat3(&mUp, newUp);
 
-	// 6. Обновляем матрицу вида.
+	// 6. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ.
 	UpdateViewMatrix();
 }
 
@@ -361,6 +361,22 @@ void Camera::UpdateViewMatrix()
 
 		mViewDirty = false;
 	}
+}
+
+void Camera::UpdateFrustum()
+{
+	XMMATRIX P = GetProj();
+	BoundingFrustum::CreateFromMatrix(mFrustum, P);
+
+	XMMATRIX view = GetView(); 
+	XMVECTOR det; 
+	XMMATRIX invView = XMMatrixInverse(&det, view);
+	mFrustum.Transform(mFrustum, invView);
+}
+
+DirectX::BoundingFrustum Camera::GetFrustum() const
+{
+	return mFrustum;
 }
 
 

@@ -79,6 +79,8 @@ public:
 	void SpeedDown();
 	// After modifying camera position/orientation, call to rebuild the view matrix.
 	void UpdateViewMatrix();
+	void UpdateFrustum();
+	DirectX::BoundingFrustum GetFrustum() const;
 
 private:
 
@@ -102,6 +104,7 @@ private:
 	float BaseSpeed = 0.3f;
 	float MaxSpeed = 0.9f;
 	bool mViewDirty = true;
+	DirectX::BoundingFrustum mFrustum;
 
 	// Cache View/Proj matrices.
 	DirectX::XMFLOAT4X4 mView = MathHelper::Identity4x4();
