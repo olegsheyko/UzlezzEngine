@@ -1,3 +1,5 @@
+
+
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
@@ -30,15 +32,15 @@ cbuffer cbMaterial : register(b2)
     float gRoughness;
     float4x4 gMatTransform;
 };
-cbuffer cbTerrainTile : register(b3) // b3 - регистр для буфера тайла
+cbuffer cbTerrainTile : register(b3) // b1 - регистр для буфера
 {
     float3 gTilePosition;
     float gTileSize;
     float mapSize;
     float heightScale;
-    float showborders;   // >0.5 включено
-    float debugMode;     // >0.5 включен режим отладки
-    float renderHMAP;    // >0.5 вывод карты высот вместо альбедо
+    float showborders;
+    float debugMode;
+    float renderHMAP;
 
 };
 // Texture resources
@@ -63,13 +65,13 @@ struct VertexIn
 
 struct VertexOut
 {
-    float4 PosH : SV_POSITION;   // Позиция в клиповом пространстве
-    float3 PosW : TEXCOORD3;     // Позиция в мировом пространстве
-    float3 NormalW : TEXCOORD4;  // Нормаль в мировом пространстве
-    float3 TangentW : TEXCOORD5; // Тангенс в мировом пространстве
-    float2 TexC : TEXCOORD0;     // Основные UV (с учётом тайла)
-    float2 TexCl : TEXCOORD1;    // Локальные UV внутри тайла (для границ)
-    float height : TEXCOORD7;    // Высота из heightmap
+    float4 PosH : SV_POSITION;
+    float3 PosW : POSITION;
+    float3 NormalW : NORMAL;
+    float3 TangentW : TANGENT;
+    float2 TexC : TEXCOORD;
+    float2 TexCl : TEXCOORD2;
+    float height : HEIGHT;
 };
 
 struct PixelOut
@@ -99,7 +101,7 @@ VertexOut VS(VertexIn vin)
     
     
     // Семплируем высоту из heightmap
-    float height = saturate(gHeightMap.SampleLevel(gSamLinearClamp, vout.TexC, 0).r);
+    float height = gHeightMap.SampleLevel(gSamLinearClamp, vout.TexC, 0).r;
     vout.height = height;
     
     // Применяем высоту к Y координате
@@ -157,7 +159,7 @@ float3 NormalSampleToWorldSpace(float3 normalMapSample, float3 unitNormalW, floa
     return bumpedNormalW;
 }
 
-PixelOut PS(VertexOut pin)
+PixelOut PS(VertexOut pin) : SV_Target
 {
     PixelOut pout;
     
@@ -169,25 +171,25 @@ PixelOut PS(VertexOut pin)
     
     // debug
     
-    if (debugMode > 0.5f)
+    if (debugMode)
     {
-        if (abs(gTileSize - mapSize) < 0.001f)
+        if (gTileSize == mapSize)
             diffuseAlbedo = float4(0.5f, 0.0f, 0.0f, 1.0f);
-        else if (abs(gTileSize - mapSize / 2.0f) < 0.001f)
+        else if (gTileSize == mapSize / 2)
             diffuseAlbedo = float4(0.8f, 0.3f, 0.0f, 1.0f);
-        else if (abs(gTileSize - mapSize / 4.0f) < 0.001f)
+        else if (gTileSize == mapSize / 4)
             diffuseAlbedo = float4(1.0f, 0.7f, 0.0f, 1.0f);
-        else if (abs(gTileSize - mapSize / 8.0f) < 0.001f)
+        else if (gTileSize == mapSize / 8)
             diffuseAlbedo = float4(0.f, 0.3f, 0.1f, 1.0f);
-        else if (abs(gTileSize - mapSize / 16.0f) < 0.001f)
+        else if (gTileSize == mapSize / 16)
             diffuseAlbedo = float4(0.1f, 0.5f, 0.1f, 1.0f);
-        else if (abs(gTileSize - mapSize / 32.0f) < 0.001f)
+        else if (gTileSize == mapSize / 32)
             diffuseAlbedo = float4(0.0f, 1.0f, 0.3f, 1.0f);
-        else if (abs(gTileSize - mapSize / 64.0f) < 0.001f)
+        else if (gTileSize == mapSize / 64)
             diffuseAlbedo = float4(0.0f, 1.0f, 1.0f, 1.0f);
     }
-
-    if (showborders > 0.5f)
+        
+    if (showborders)
     {
         float2 uv = pin.TexCl;
         if (uv.x < 0.005 || uv.x > 0.995 || uv.y < 0.005 || uv.y > 0.995)
@@ -207,7 +209,7 @@ PixelOut PS(VertexOut pin)
     float3 bumpedNormalW = NormalSampleToWorldSpace(normalMapSample, pin.NormalW, pin.TangentW);
     
     // Выводим в G-Buffer
-    if (renderHMAP > 0.5f)
+    if (renderHMAP)
         pout.Albedo = gHeightMap.Sample(gSamAnisotropicWrap, pin.TexC).rgba;
     else
         pout.Albedo = diffuseAlbedo;

@@ -81,7 +81,6 @@ public:
 	void UpdateViewMatrix();
 	void UpdateFrustum();
 	DirectX::BoundingFrustum GetFrustum() const;
-
 private:
 
 	// Camera coordinate system with coordinates relative to world space.
@@ -100,12 +99,11 @@ private:
 	float mNearWindowHeight = 0.0f;
 	float mFarWindowHeight = 0.0f;
 
-	float CurSpeed = 0.3f;
-	float BaseSpeed = 0.3f;
-	float MaxSpeed = 0.9f;
+	float CurSpeed = 3.0f;
+	float BaseSpeed = 3.0f;
+	float MaxSpeed = 20.0f;
 	bool mViewDirty = true;
 	DirectX::BoundingFrustum mFrustum;
-
 	// Cache View/Proj matrices.
 	DirectX::XMFLOAT4X4 mView = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 mProj = MathHelper::Identity4x4();

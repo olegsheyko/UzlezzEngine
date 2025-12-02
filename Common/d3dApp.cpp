@@ -262,6 +262,14 @@ void D3DApp::OnResize()
 	mScreenViewport.MaxDepth = 1.0f;
 
     mScissorRect = { 0, 0, mClientWidth, mClientHeight };
+
+	mScreenViewport1.TopLeftX = 0;
+	mScreenViewport1.TopLeftY = 0;
+	mScreenViewport1.Width = static_cast<float>(mClientWidth/8);
+	mScreenViewport1.Height = static_cast<float>(mClientHeight/8);
+	mScreenViewport1.MinDepth = 0.0f;
+	mScreenViewport1.MaxDepth = 1.0f;
+    mScissorRect1 = { 0, 0, mClientWidth/8, mClientHeight/8 };
 }
  
 LRESULT D3DApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -638,10 +646,10 @@ void D3DApp::CalculateFrameStats()
 
 		// Приводим к строке с нужной точностью (целые fps, одно десятичное для mspf)
 		wchar_t buf[64];
-		swprintf(buf, 64, L"%d кадров/с   %.1f ms/кадр", static_cast<int>(fps), mspf);
+		swprintf(buf, 64, L"%d fps   %.1f mspf", static_cast<int>(fps), mspf);
 
 		// Строка заголовка
-		std::wstring windowText = mMainWndCaption + L"    " + buf + L"   скорость камеры: " + GetCamSpeed();
+		std::wstring windowText = mMainWndCaption + L"    " + buf + L"   speed: " + GetCamSpeed();
 		SetWindowText(mhMainWnd, windowText.c_str());
 
 		// Сбрасываем счётчики

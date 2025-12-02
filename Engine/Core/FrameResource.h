@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../../Common/d3dUtil.h"
-#include "../../Common/MathHelper.h"
-#include "../../Common/UploadBuffer.h"
+#include "../Common/d3dUtil.h"
+#include "../Common/MathHelper.h"
+#include "../Common/UploadBuffer.h"
 
 struct ObjectConstants
 {
@@ -67,14 +67,13 @@ struct TerrainTileConstants
     float debugMode = 1;
     float renderHMAP = 0;
 };
-
 // Stores the resources needed for the CPU to build the command lists
 // for a frame.  
 struct FrameResource
 {
 public:
     
-    FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT materialCount,UINT lightCount);
+    FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT materialCount,UINT lightCount,UINT tileCount);
     FrameResource(const FrameResource& rhs) = delete;
     FrameResource& operator=(const FrameResource& rhs) = delete;
     ~FrameResource();

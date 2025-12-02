@@ -1,4 +1,4 @@
-//***************************************************************************************
+﻿//***************************************************************************************
 // Camera.h by Frank Luna (C) 2011 All Rights Reserved.
 //***************************************************************************************
 
@@ -8,7 +8,6 @@ using namespace DirectX;
 
 Camera::Camera()
 {
-	SetLens(0.25f*MathHelper::Pi, 1.0f, 1.0f, 1000.0f);
 	DirectX::XMStoreFloat4(&orientation,DirectX::XMQuaternionIdentity());
 }
 
@@ -127,6 +126,7 @@ void Camera::SetLens(float fovY, float aspect, float zn, float zf)
 
 	XMMATRIX P = XMMatrixPerspectiveFovLH(mFovY, mAspect, mNearZ, mFarZ);
 	XMStoreFloat4x4(&mProj, P);
+	mViewDirty = true;
 }
 
 void Camera::LookAt(FXMVECTOR pos, FXMVECTOR target, FXMVECTOR worldUp)
@@ -250,35 +250,36 @@ void Camera::Yaw(float angle)
 
 void Camera::YawPitch(float yawDelta, float pitchDelta)
 {
-	// 1. ������������ ��������� �����.
+	// 1. Аккумулируем изменения углов.
 	mYaw += yawDelta;
 	mPitch += pitchDelta;
 
-	// 2. ������������ ���� ������� (pitch) �������� �89 ��������.
-	float pitchLimit = XM_PIDIV2 - 0.01f; // XM_PIDIV2 = 90 ��������, ������ ���� ������, ����� �������� ����.
+	// 2. Ограничиваем угол наклона (pitch) примерно ±89 градусов.
+	float pitchLimit = XM_PIDIV2 - 0.01f; // XM_PIDIV2 = 90 градусов, отступ чуть меньше, чтобы избежать гима.
 	if (mPitch > pitchLimit)
 		mPitch = pitchLimit;
 	if (mPitch < -pitchLimit)
 		mPitch = -pitchLimit;
 
-	// 3. ������������� ���������� ������ ��� ���������� �� ����������� ����� (��� ����� �����).
+	// 3. Пересчитываем ориентацию камеры как кватернион из накопленных углов (без учета крена).
 	XMVECTOR q = XMQuaternionRotationRollPitchYaw(mPitch, mYaw, 0.0f);
 	XMStoreFloat4(&orientation, q);
 
-	// 4. ��������� ����� ������ �������.
+	// 4. Вычисляем новый вектор взгляда.
 	XMVECTOR baseForward = XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
 	XMVECTOR newForward = XMVector3Rotate(baseForward, q);
 	newForward = XMVector3Normalize(newForward);
 	XMStoreFloat3(&mLook, newForward);
 
-	// 5. ��������� ������ � ������� ������� ������.
+	// 5. Вычисляем правый и верхний векторы камеры.
 	XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 	XMVECTOR newRight = XMVector3Normalize(XMVector3Cross(worldUp, newForward));
 	XMStoreFloat3(&mRight, newRight);
 	XMVECTOR newUp = XMVector3Normalize(XMVector3Cross(newForward, newRight));
 	XMStoreFloat3(&mUp, newUp);
-
-	// 6. ��������� ������� ����.
+	
+	mViewDirty = true;
+	// 6. Обновляем матрицу вида.
 	UpdateViewMatrix();
 }
 
@@ -361,10 +362,12 @@ void Camera::UpdateViewMatrix()
 
 		mViewDirty = false;
 	}
+	UpdateFrustum();
 }
 
-void Camera::UpdateFrustum()
-{
+DirectX::BoundingFrustum Camera::GetFrustum() const { return mFrustum; }
+
+void Camera::UpdateFrustum() {
 	XMMATRIX P = GetProj();
 	BoundingFrustum::CreateFromMatrix(mFrustum, P);
 
@@ -373,10 +376,3 @@ void Camera::UpdateFrustum()
 	XMMATRIX invView = XMMatrixInverse(&det, view);
 	mFrustum.Transform(mFrustum, invView);
 }
-
-DirectX::BoundingFrustum Camera::GetFrustum() const
-{
-	return mFrustum;
-}
-
-

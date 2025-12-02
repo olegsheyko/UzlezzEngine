@@ -10,7 +10,6 @@
 #include "RenderItem.h"
 #include "TerrainSystem/TerrainSystem.h"
 #include "TerrainSystem/NoiseGeneration.h"
-//#include "NoiseGeneration.h"
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -33,7 +32,6 @@ public:
 private:
 	virtual void OnResize()override;
 	virtual void Update(const GameTimer& gt)override;
-	virtual void Draw(const GameTimer& gt)override;
 	virtual void DeferredDraw(const GameTimer& gt)override;
 	virtual void OnMouseDown(WPARAM btnState, int x, int y)override;
 	virtual void OnMouseUp(WPARAM btnState, int x, int y)override;
@@ -123,17 +121,17 @@ private:
 
 	POINT mLastMousePos;
 
-	// Ресурсы G-буфера
+	// G-Buffer �������
 	ComPtr<ID3D12Resource> mGBufferPosition;
 	ComPtr<ID3D12Resource> mGBufferNormal;
 	ComPtr<ID3D12Resource> mGBufferAlbedo;
 	ComPtr<ID3D12Resource> mGBufferDepthStencil;
 	ComPtr<ID3D12DescriptorHeap> mGBufferSrvHeap = nullptr;
 
-	// Дескрипторы для G-буфера
+	// ����������� ��� G-Buffer
 	CD3DX12_CPU_DESCRIPTOR_HANDLE mGBufferRTVs[3]; // 0:Position, 1:Normal, 2:Albedo
 	CD3DX12_CPU_DESCRIPTOR_HANDLE mGBufferDSV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE mGBufferSRVs[3]; // SRV для чтения
+	CD3DX12_GPU_DESCRIPTOR_HANDLE mGBufferSRVs[3]; // SRV ��� ��������
 
 	UINT mGBufferRTVDescriptorSize;
 	UINT mGBufferDSVDescriptorSize;
@@ -149,11 +147,11 @@ private:
 	D3D12_VIEWPORT mShadowViewport;
 	D3D12_RECT mShadowScissorRect;
 
-	// Ширина и высота
+	// ������� ��� � ����
 	UINT width = mClientWidth;
 	UINT height = mClientHeight;
 
-	// Форматы:
+	// �������:
 	const DXGI_FORMAT positionFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	const DXGI_FORMAT normalFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	const DXGI_FORMAT albedoFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -161,12 +159,12 @@ private:
 
 	// Terrain system
 	std::unique_ptr<TerrainSystem> m_terrainSystem;
-	XMFLOAT4 m_frustumPlanes[6];  // Плоскости усеченной пирамиды (frustum)
+	XMFLOAT4 m_frustumPlanes[6];  // ��������� frustum'a
 	std::vector<TerrainTile*> m_visibleTerrainTiles;
 	float heightScale = 100;
 	ComPtr<ID3D12Resource> m_generatedHeightMap;
 	NoiseGenerator noiseGen;
-	// Методы
+	// ������
 	void GenerateTileGeometry(const XMFLOAT3& worldPos, float tileSize, int lodLevel, std::vector<Vertex>& vertices, std::vector<std::uint32_t>& indices);
 	void BuildTerrainGeometry();
 	void UpdateTerrain(const GameTimer& gt);

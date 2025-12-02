@@ -1,82 +1,82 @@
 #include "TerrainSystem.h"
-#include "../UzlezzEngine.h"
+#include "../../Core/UzlezzEngine.h"
+// Реализация методов terrain системы
 
-bool QuadTreeNode::ShouldSplit(const XMFLOAT3& cameraPos, float heightscale, int mapsize) const
+
+bool QuadTreeNode::ShouldSplit(const XMFLOAT3& cameraPos, float heightscale,int mapsize) const
 {
     auto camPos = cameraPos;
     camPos.y = 0;
     XMVECTOR camPosVec = XMLoadFloat3(&camPos);
-    float lodneeddist = ( mapsize/2.0f - depth * mapsize/16.0f);
+    float lodneeddist = ( mapsize/2.0f - depth * mapsize/16);
     BoundingSphere sphere;
     sphere.Center = cameraPos;
     sphere.Radius = lodneeddist;
-    return sphere.Intersects(boundingBox);
+    if (sphere.Intersects(boundingBox))
+    {
+        return true;
+    }
+    return false;
 }
 
-void QuadTreeNode::UpdateVisibility(BoundingFrustum& frustum, const XMFLOAT3& cameraPos,
-    std::vector<TerrainTile*>& visibleTiles, float heightscale, int mapsize)
+// 4. Обновление видимости в квадродереве
+void QuadTreeNode::UpdateVisibility(BoundingFrustum& frustum, const XMFLOAT3& cameraPos, std::vector<TerrainTile*>& visibleTiles,float heightscale, int mapsize)
 {
     if (frustum.Contains(boundingBox) == DISJOINT)
     {
-        return;
+        return; // Узел полностью не виден
     }
+
+    // Если узел является "листом" (нет дочерних узлов) или не нужно его разбивать
     if (!children[0] || !ShouldSplit(cameraPos, heightscale, mapsize))
     {
+        // Рендерим текущий узел (тайл)
         if (tile)
         {
             visibleTiles.push_back(tile);
         }
     }
-    else
+    else // Если нужно разбивать
     {
+        // Рекурсивно обновляем видимость дочерних узлов
         for (int i = 0; i < 4; i++)
         {
             if (children[i])
             {
-                children[i]->UpdateVisibility(frustum, cameraPos, visibleTiles, heightscale, mapsize);
+                children[i]->UpdateVisibility(frustum, cameraPos, visibleTiles,heightscale, mapsize);
             }
         }
     }
 }
 
-void TerrainSystem::Initialize(ID3D12Device* device, int HeightMapIndex, std::string hmapname, float worldSize,
-    int maxLOD)
+// 5. Инициализация terrain системы
+// кто прочитал, тот лошарик
+void TerrainSystem::Initialize(ID3D12Device* device, int HeightMapIndex, std::string hmapname,
+    float worldSize, int maxLOD)
 {
     m_worldSize = worldSize;
-    m_hmapIndex = HeightMapIndex;
-    m_hmapname = hmapname;
     m_maxLOD = maxLOD;
-    m_heightScale = 50.0f;
+    m_heightScale = 50.0f; // настраиваемый параметр
+    m_hmapIndex = HeightMapIndex;
+    // Создаем корневой узел квадродерева
     m_rootNode = std::make_unique<QuadTreeNode>();
     m_rootNode->depth = 0;
-    int initialSize = (int)worldSize;
+    m_hmapname = hmapname;
+    // Строим квадродерево рекурсивно
+    int initialSize = (int)worldSize; // 2^maxLOD
     BuildQuadTree(m_rootNode.get(), 0, 0, initialSize, 0);
-
-}
-
-void TerrainSystem::Update(const XMFLOAT3& cameraPos, BoundingFrustum& frustum)
-{
-    m_visibleTiles.clear();
-    if (m_rootNode)
-        m_rootNode->UpdateVisibility(frustum, cameraPos, m_visibleTiles, m_heightScale, (int)m_worldSize);
-}
-
-std::vector<std::shared_ptr<TerrainTile>>& TerrainSystem::GetAllTiles()
-{
-    return m_allTiles;
-}
-
-void TerrainSystem::GetVisibleTiles(std::vector<TerrainTile*>& visibleTiles)
-{
-    visibleTiles = m_visibleTiles;
 }
 
 void TerrainSystem::BuildQuadTree(QuadTreeNode* node, int x, int y, int size, int depth)
 {
     node->depth = depth;
+    // Вычисляем мировые координаты узла
     float tileSize = m_worldSize / (1 << depth);
-    node->boundingBox = CalculateTileAABB(XMFLOAT3((float)x, 0, (float)y), tileSize, -10.0f, 400.0f);
 
+    // Вычисляем AABB для этого узла.
+    // Пока что упрощенно, без учета хайтмапы
+    node->boundingBox = CalculateTileAABB(XMFLOAT3((float)x, 0, (float)y), tileSize, -10.0f, 400.0f);
+   
     auto tile = std::make_unique<TerrainTile>();
     tile->worldPos = XMFLOAT3((float)x, 0, (float)y);
     tile->lodLevel = depth;
@@ -99,7 +99,6 @@ void TerrainSystem::BuildQuadTree(QuadTreeNode* node, int x, int y, int size, in
         }
     }
 }
-
 BoundingBox TerrainSystem::CalculateTileAABB(const XMFLOAT3& pos, float size, float minHeight, float maxHeight)
 {
     BoundingBox aabb;
@@ -111,7 +110,26 @@ BoundingBox TerrainSystem::CalculateTileAABB(const XMFLOAT3& pos, float size, fl
     return aabb;
 }
 
-void UzlezzEngine::GenerateTileGeometry(const XMFLOAT3& worldPos, float tileSize, int lodLevel, std::vector<Vertex>& vertices, std::vector<std::uint32_t>& indices)
+void TerrainSystem::Update(const XMFLOAT3& cameraPos, BoundingFrustum& frustum)
+{
+    m_visibleTiles.clear();
+    if (m_rootNode)
+    {
+        m_rootNode->UpdateVisibility(frustum, cameraPos, m_visibleTiles, m_heightScale, (int)m_worldSize);
+    }
+}
+
+std::vector<std::shared_ptr<TerrainTile>>& TerrainSystem::GetAllTiles()
+{
+    return m_allTiles;
+}
+
+void TerrainSystem::GetVisibleTiles(std::vector<TerrainTile*>& outTiles)
+{
+    outTiles = m_visibleTiles;
+}
+void UzlezzEngine::GenerateTileGeometry(const XMFLOAT3& worldPos, float tileSize, int lodLevel,
+    std::vector<Vertex>& vertices, std::vector<std::uint32_t>& indices)
 {
     int baseResolution = 16;
     float Factor = 1;
@@ -172,7 +190,7 @@ void UzlezzEngine::GenerateTileGeometry(const XMFLOAT3& worldPos, float tileSize
         vertices.push_back(vertex);
     }
 
-    // 3. Генерируем индексы для основных треугольников тайла
+    // 3. Генерируем индексы для основного тайла
     for (int z = 0; z < resolution - 1; z++)
     {
         for (int x = 0; x < resolution - 1; x++)
@@ -185,16 +203,19 @@ void UzlezzEngine::GenerateTileGeometry(const XMFLOAT3& worldPos, float tileSize
             indices.push_back(topLeft);
             indices.push_back(bottomLeft);
             indices.push_back(topRight);
+
             indices.push_back(topRight);
             indices.push_back(bottomLeft);
             indices.push_back(bottomRight);
         }
     }
-    // 4. Генерируем индексы для юбок
+
+    // 4. Индексы для юбки - простая версия
     int leftSkirtStart = mainVertexCount;
     int rightSkirtStart = leftSkirtStart + resolution;
     int bottomSkirtStart = rightSkirtStart + resolution;
     int topSkirtStart = bottomSkirtStart + (resolution - 2);
+
     // Левая юбка
     for (int z = 0; z < resolution - 1; z++)
     {
@@ -202,27 +223,33 @@ void UzlezzEngine::GenerateTileGeometry(const XMFLOAT3& worldPos, float tileSize
         UINT edge2 = (z + 1) * resolution;
         UINT skirt1 = leftSkirtStart + z;
         UINT skirt2 = leftSkirtStart + z + 1;
+
         indices.push_back(edge1);
         indices.push_back(skirt1);
         indices.push_back(edge2);
+
         indices.push_back(edge2);
         indices.push_back(skirt1);
         indices.push_back(skirt2);
     }
-    // Правая юбка
+
+    // Правая юбка  
     for (int z = 0; z < resolution - 1; z++)
     {
         UINT edge1 = z * resolution + (resolution - 1);
         UINT edge2 = (z + 1) * resolution + (resolution - 1);
         UINT skirt1 = rightSkirtStart + z;
         UINT skirt2 = rightSkirtStart + z + 1;
+
         indices.push_back(edge1);
         indices.push_back(edge2);
         indices.push_back(skirt1);
+
         indices.push_back(edge2);
         indices.push_back(skirt2);
         indices.push_back(skirt1);
     }
+
     // Нижняя юбка
     for (int x = 1; x < resolution - 2; x++)
     {
@@ -230,13 +257,16 @@ void UzlezzEngine::GenerateTileGeometry(const XMFLOAT3& worldPos, float tileSize
         UINT edge2 = x + 1;
         UINT skirt1 = bottomSkirtStart + (x - 1);
         UINT skirt2 = bottomSkirtStart + x;
+
         indices.push_back(edge1);
         indices.push_back(edge2);
         indices.push_back(skirt1);
+
         indices.push_back(edge2);
         indices.push_back(skirt2);
         indices.push_back(skirt1);
     }
+
     // Верхняя юбка
     for (int x = 1; x < resolution - 2; x++)
     {
@@ -244,9 +274,11 @@ void UzlezzEngine::GenerateTileGeometry(const XMFLOAT3& worldPos, float tileSize
         UINT edge2 = (resolution - 1) * resolution + x + 1;
         UINT skirt1 = topSkirtStart + (x - 1);
         UINT skirt2 = topSkirtStart + x;
+
         indices.push_back(edge1);
         indices.push_back(skirt1);
         indices.push_back(edge2);
+
         indices.push_back(edge2);
         indices.push_back(skirt1);
         indices.push_back(skirt2);
@@ -257,9 +289,11 @@ void UzlezzEngine::BuildTerrainGeometry()
 {
     auto terrainGeo = std::make_unique<MeshGeometry>();
     terrainGeo->Name = "terrainGeo";
-    // Получаем все тайлы из terrain системы
+
+    // Получаем тайлы из terrain системы
     auto& allTiles = m_terrainSystem->GetAllTiles();
-    // Создаём массив вершин для всех тайлов
+
+    // Создаем один большой массив вершин для всех тайлов
     std::vector<Vertex> allVertices;
     std::vector<std::uint32_t> allIndices;
 
@@ -323,6 +357,7 @@ void UzlezzEngine::BuildTerrainGeometry()
 void UzlezzEngine::RegenerateHeightMap()
 {
     FlushCommandQueue();
+
     ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
     mTextures["GeneratedHeightMap"]->Resource.Reset();
@@ -356,25 +391,22 @@ void UzlezzEngine::RegenerateHeightMap()
 
 void UzlezzEngine::UpdateTerrain(const GameTimer& gt)
 {
-    if (!m_terrainSystem) return;
+    if (!m_terrainSystem)
+        return;
+
+    // Обновляем позицию камеры
     XMVECTOR camPos = cam.GetPosition();
     XMFLOAT3 cameraPosition;
     XMStoreFloat3(&cameraPosition, camPos);
 
+    // Извлекаем плоскости frustum
     XMMATRIX view = XMLoadFloat4x4(&mView);
     XMMATRIX proj = XMLoadFloat4x4(&mProj);
     XMMATRIX viewProj = XMMatrixMultiply(view, proj);
 
+    // Обновляем terrain систему. Это заполняет m_visibleTiles
     m_terrainSystem->Update(cameraPosition, cam.GetFrustum());
     m_terrainSystem->m_heightScale = heightScale;
+
 }
-
-
-
-
-
-
-
-
-
 
