@@ -394,7 +394,7 @@ void UzlezzEngine::UpdateTerrain(const GameTimer& gt)
     if (!m_terrainSystem)
         return;
 
-    // Обновляем позицию камеры
+    // Обновляем позицию камеры 
     XMVECTOR camPos = cam.GetPosition();
     XMFLOAT3 cameraPosition;
     XMStoreFloat3(&cameraPosition, camPos);
