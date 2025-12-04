@@ -22,10 +22,10 @@ bool QuadTreeNode::ShouldSplit(const XMFLOAT3& cameraPos, float heightscale,int 
 // 4. Обновление видимости в квадродереве
 void QuadTreeNode::UpdateVisibility(BoundingFrustum& frustum, const XMFLOAT3& cameraPos, std::vector<TerrainTile*>& visibleTiles,float heightscale, int mapsize)
 {
-    if (frustum.Contains(boundingBox) == DISJOINT)
-    {
-        return; // Узел полностью не виден
-    }
+    // if (frustum.Contains(boundingBox) == DISJOINT)
+    // {
+    //     return; // Узел полностью не виден
+    // }
 
     // Если узел является "листом" (нет дочерних узлов) или не нужно его разбивать
     if (!children[0] || !ShouldSplit(cameraPos, heightscale, mapsize))
