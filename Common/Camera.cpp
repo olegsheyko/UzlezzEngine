@@ -230,9 +230,8 @@ void Camera::Pitch(float angle)
 
 	XMStoreFloat3(&mRight, XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&mUp), XMLoadFloat3(&mLook))));
 	XMStoreFloat3(&mUp, XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&mLook), XMLoadFloat3(&mRight))));
-	UpdateViewMatrix();
-
 	mViewDirty = true;
+	UpdateViewMatrix();
 }
 void Camera::Yaw(float angle)
 {
@@ -244,8 +243,8 @@ void Camera::Yaw(float angle)
 
 	XMStoreFloat3(&mRight, XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&mUp), XMLoadFloat3(&mLook))));
 	XMStoreFloat3(&mUp, XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&mLook), XMLoadFloat3(&mRight))));
-	UpdateViewMatrix();
 	mViewDirty = true;
+	UpdateViewMatrix();
 }
 
 void Camera::YawPitch(float yawDelta, float pitchDelta)
@@ -317,6 +316,7 @@ void Camera::SpeedDown()
 }
 void Camera::UpdateViewMatrix()
 {
+	// Всегда пересчитываем матрицу вида и фруструм, если были изменения камеры.
 	if(mViewDirty)
 	{
 		XMVECTOR R = XMLoadFloat3(&mRight);
