@@ -362,6 +362,9 @@ void UzlezzEngine::RegenerateHeightMap()
 
     mTextures["GeneratedHeightMap"]->Resource.Reset();
     mTextures["GeneratedHeightMap"]->UploadHeap.Reset();
+    
+    noiseGen.offset = XMFLOAT2(static_cast<float>(rand() % 1000), static_cast<float>(rand() % 1000));
+    
     mTextures["GeneratedHeightMap"]->Resource = noiseGen.GenerateNoiseTexture(md3dDevice.Get(), mCommandList.Get(), 1024, 1024, mTextures["GeneratedHeightMap"]->UploadHeap);
 
     int textureIndex = TexOffsets["GeneratedHeightMap"];

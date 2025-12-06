@@ -77,6 +77,7 @@ private:
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
 	void CreateSpotLight(XMFLOAT3 pos, XMFLOAT3 rot, XMFLOAT3 color, float faloff_start, float faloff_end, float strength, float spotpower);
 	void CreatePointLight(XMFLOAT3 pos, XMFLOAT3 color, float faloff_start, float faloff_end, float strength);
+	void RegenerateTerrainFromNoise();
 
 private:
 	std::unordered_map<std::string, unsigned int>ObjectsMeshCount;

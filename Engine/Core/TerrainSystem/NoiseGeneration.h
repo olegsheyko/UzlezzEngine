@@ -87,7 +87,7 @@ struct NoiseGenerator
 	float amplitude = 1.0f;       // Начальная амплитуда
 	float frequency = 1.0f;       // Начальная частота
 	float maxValue = 0.0f;        // Суммарная теоретическая амплитуда (для нормализации)
-	XMFLOAT2 offset = XMFLOAT2(0.f, 0.f); // Смещение координат (движение шума)
+	XMFLOAT2 offset = XMFLOAT2(7.f, 15.f); // Смещение координат (движение шума)
 	ComPtr<ID3D12Resource> GenerateNoiseTexture(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, int width, int height, ComPtr<ID3D12Resource>& uploadBuffer);
 private:
 	float hash2D(XMFLOAT2 p);     // Простейший хэш для генерации псевдослучайных значений
