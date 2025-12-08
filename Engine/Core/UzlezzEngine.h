@@ -79,6 +79,12 @@ private:
 	void CreatePointLight(XMFLOAT3 pos, XMFLOAT3 color, float faloff_start, float faloff_end, float strength);
 	void RegenerateTerrainFromNoise();
 
+	// --- TAA helpers ---
+	void InitializeTAAResources();
+	void ResizeTAAResources();
+	void UpdateTAAConstants(const GameTimer& gt);
+	void ExecuteTAAPass(ID3D12GraphicsCommandList* cmdList);
+
 private:
 	std::unordered_map<std::string, unsigned int>ObjectsMeshCount;
 	std::vector<std::unique_ptr<FrameResource>> mFrameResources;
@@ -122,17 +128,17 @@ private:
 
 	POINT mLastMousePos;
 
-	// G-Buffer �������
+	// G-Buffer ресурсы
 	ComPtr<ID3D12Resource> mGBufferPosition;
 	ComPtr<ID3D12Resource> mGBufferNormal;
 	ComPtr<ID3D12Resource> mGBufferAlbedo;
 	ComPtr<ID3D12Resource> mGBufferDepthStencil;
 	ComPtr<ID3D12DescriptorHeap> mGBufferSrvHeap = nullptr;
 
-	// ����������� ��� G-Buffer
+	// RTV/DSV для G-Buffer
 	CD3DX12_CPU_DESCRIPTOR_HANDLE mGBufferRTVs[3]; // 0:Position, 1:Normal, 2:Albedo
 	CD3DX12_CPU_DESCRIPTOR_HANDLE mGBufferDSV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE mGBufferSRVs[3]; // SRV ��� ��������
+	CD3DX12_GPU_DESCRIPTOR_HANDLE mGBufferSRVs[3]; // SRV для чтения
 
 	UINT mGBufferRTVDescriptorSize;
 	UINT mGBufferDSVDescriptorSize;
@@ -148,24 +154,43 @@ private:
 	D3D12_VIEWPORT mShadowViewport;
 	D3D12_RECT mShadowScissorRect;
 
-	// ������� ��� � ����
+	// Размеры для RT и G-Buffer
 	UINT width = mClientWidth;
 	UINT height = mClientHeight;
 
-	// �������:
+	// Форматы:
 	const DXGI_FORMAT positionFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	const DXGI_FORMAT normalFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	const DXGI_FORMAT albedoFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
+	// --- TAA state & resources ---
+	bool mEnableTAA = false;
+	float mTaaFeedbackMin = 0.9f;
+	float mTaaFeedbackMax = 0.98f;
+	float mTaaJitterScale = 1.0f;
+	float mTaaSharpness = 0.0f;
+	float mTaaMotionBlend = 1.0f;
+
+	// Текущее/предыдущее смещение jitter и счётчик кадров
+	XMFLOAT2 mCurrJitter = { 0.0f, 0.0f };
+	XMFLOAT2 mPrevJitter = { 0.0f, 0.0f };
+	UINT mTaaFrameIndex = 0;
+	bool mTaaResetHistory = true;
+	UINT mTaaHistoryIndex = 0; // 0/1 для ping-pong
+
+	// Исторические буферы и вспомогательные RT
+	ComPtr<ID3D12Resource> mTaaHistory[2];
+	ComPtr<ID3D12Resource> mLightingResult;   // HDR результат перед TAA
+	ComPtr<ID3D12Resource> mVelocityBuffer;   // буфер скоростей
 
 	// Terrain system
 	std::unique_ptr<TerrainSystem> m_terrainSystem;
-	XMFLOAT4 m_frustumPlanes[6];  // ��������� frustum'a
+	XMFLOAT4 m_frustumPlanes[6];  // Плоскости frustum'a
 	std::vector<TerrainTile*> m_visibleTerrainTiles;
 	float heightScale = 100;
 	ComPtr<ID3D12Resource> m_generatedHeightMap;
 	NoiseGenerator noiseGen;
-	// ������
+	// Высота
 	void GenerateTileGeometry(const XMFLOAT3& worldPos, float tileSize, int lodLevel, std::vector<Vertex>& vertices, std::vector<std::uint32_t>& indices);
 	void BuildTerrainGeometry();
 	void UpdateTerrain(const GameTimer& gt);

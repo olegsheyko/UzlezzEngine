@@ -30,6 +30,19 @@ struct PassConstants
 
     DirectX::XMFLOAT4 AmbientLight = { 0.0f, 0.0f, 0.0f, 1.0f };
 
+    // Дополнительные поля для TAA.
+    DirectX::XMFLOAT4X4 PrevView = MathHelper::Identity4x4();
+    DirectX::XMFLOAT4X4 PrevProj = MathHelper::Identity4x4();
+    DirectX::XMFLOAT4X4 PrevViewProj = MathHelper::Identity4x4();
+    DirectX::XMFLOAT2 Jitter = { 0.0f, 0.0f };
+    DirectX::XMFLOAT2 PrevJitter = { 0.0f, 0.0f };
+    float TaaFeedbackMin = 0.0f;
+    float TaaFeedbackMax = 0.0f;
+    float TaaSharpness = 0.0f;
+    float TaaMotionBlend = 0.0f;
+    int   TaaEnabled = 0;
+    DirectX::XMFLOAT3 PadTAA = { 0.0f, 0.0f, 0.0f };
+
     // Indices [0, NUM_DIR_LIGHTS) are directional lights;
     // indices [NUM_DIR_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHTS) are point lights;
     // indices [NUM_DIR_LIGHTS+NUM_POINT_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHT+NUM_SPOT_LIGHTS)

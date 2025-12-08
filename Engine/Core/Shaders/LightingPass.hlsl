@@ -34,6 +34,18 @@ cbuffer cbPass : register(b0)
     float gDeltaTime;
     float4 gAmbientLight;
 
+    float4x4 gPrevView;
+    float4x4 gPrevProj;
+    float4x4 gPrevViewProj;
+    float2   gJitter;
+    float2   gPrevJitter;
+    float    gTaaFeedbackMin;
+    float    gTaaFeedbackMax;
+    float    gTaaSharpness;
+    float    gTaaMotionBlend;
+    int      gTaaEnabled;
+    float3   gTaaPad;
+
     // Indices [0, NUM_DIR_LIGHTS) are directional lights;
     // indices [NUM_DIR_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHTS) are point lights;
     // indices [NUM_DIR_LIGHTS+NUM_POINT_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHT+NUM_SPOT_LIGHTS)
