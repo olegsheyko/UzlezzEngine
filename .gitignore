@@ -44,6 +44,8 @@ Generated\ Files/
 .idea/
 *.sln.iml
 
+plans/
+
 # Plugins
 GhostTextManager_v2.xml
 
