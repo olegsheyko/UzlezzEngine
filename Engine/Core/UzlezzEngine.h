@@ -99,6 +99,7 @@ private:
 	ComPtr<ID3D12RootSignature> mTerrainRootSignature = nullptr;
 	ComPtr<ID3D12RootSignature> mLightingRootSignature = nullptr;
 	ComPtr<ID3D12RootSignature> mShadowPassRootSignature = nullptr;
+	ComPtr<ID3D12RootSignature> mTaaRootSignature = nullptr;
 
 	ComPtr<ID3D12DescriptorHeap> mSrvDescriptorHeap = nullptr;
 	ComPtr<ID3D12DescriptorHeap> m_ImGuiSrvDescriptorHeap; // Member variable
@@ -108,6 +109,8 @@ private:
 	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> mPSOs;
+	ComPtr<ID3D12PipelineState> mTaaPSO = nullptr;
+	ComPtr<ID3D12PipelineState> mVelocityPSO = nullptr;
 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
 
