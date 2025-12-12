@@ -188,6 +188,14 @@ private:
 	ComPtr<ID3D12Resource> mLightingResult;   // HDR результат перед TAA
 	ComPtr<ID3D12Resource> mVelocityBuffer;   // буфер скоростей
 
+	// RTV/SRV дескрипторы для TAA-ресурсов
+	CD3DX12_CPU_DESCRIPTOR_HANDLE mLightingResultRTV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE mVelocityBufferRTV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE mTaaHistoryRTV[2];
+	CD3DX12_GPU_DESCRIPTOR_HANDLE mLightingResultSRV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE mVelocityBufferSRV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE mTaaHistorySRV[2];
+
 	// Terrain system
 	std::unique_ptr<TerrainSystem> m_terrainSystem;
 	XMFLOAT4 m_frustumPlanes[6];  // Плоскости frustum'a
