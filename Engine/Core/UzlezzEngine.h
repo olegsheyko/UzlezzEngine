@@ -60,6 +60,7 @@ private:
 	void BuildTerrainRootSignature();
 	void BuildLightingRootSignature();
 	void BuildShadowPassRootSignature();
+	void BuildTAARootSignature();
 	void BuildLights();
 	void SetLightShapes();
 	void BuildDescriptorHeaps();
