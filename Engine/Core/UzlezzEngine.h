@@ -102,6 +102,7 @@ private:
 	ComPtr<ID3D12RootSignature> mLightingRootSignature = nullptr;
 	ComPtr<ID3D12RootSignature> mShadowPassRootSignature = nullptr;
 	ComPtr<ID3D12RootSignature> mTaaRootSignature = nullptr;
+	ComPtr<ID3D12RootSignature> mVelocityRootSignature = nullptr;
 
 	ComPtr<ID3D12DescriptorHeap> mSrvDescriptorHeap = nullptr;
 	ComPtr<ID3D12DescriptorHeap> m_ImGuiSrvDescriptorHeap; // Member variable
