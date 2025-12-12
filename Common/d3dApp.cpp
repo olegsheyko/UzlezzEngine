@@ -150,7 +150,7 @@ bool D3DApp::Initialize()
 void D3DApp::CreateRtvAndDsvDescriptorHeaps()
 {
     D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
-    rtvHeapDesc.NumDescriptors = SwapChainBufferCount+3;
+    rtvHeapDesc.NumDescriptors = SwapChainBufferCount+4;
     rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
     rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	rtvHeapDesc.NodeMask = 0;
@@ -627,7 +627,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3DApp::DepthStencilView()const
 
 void D3DApp::CalculateFrameStats()
 {
-	// Считаем количество кадров и время
+	// пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ
 	static int frameCnt = 0;
 	static float timeElapsed = 0.0f;
 
@@ -636,25 +636,25 @@ void D3DApp::CalculateFrameStats()
 	float totalTime = mTimer.TotalTime();
 	float deltaTime = totalTime - timeElapsed;
 
-	// Обновляем статистику раз в секунду
+	// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 	if (deltaTime >= 1.0f)
 	{
-		// FPS = кол-во кадров / прошедшее время (в секундах)
+		// FPS = пїЅпїЅпїЅ-пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ / пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ)
 		float fps = frameCnt / deltaTime;
-		// mspf = миллисекунд на кадр
+		// mspf = пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ
 		float mspf = 1000.0f / fps;
 
-		// Приводим к строке с нужной точностью (целые fps, одно десятичное для mspf)
+		// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅ fps, пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ mspf)
 		wchar_t buf[64];
 		swprintf(buf, 64, L"%d fps   %.1f mspf", static_cast<int>(fps), mspf);
 
-		// Строка заголовка
+		// пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 		std::wstring windowText = mMainWndCaption + L"    " + buf + L"   speed: " + GetCamSpeed();
 		SetWindowText(mhMainWnd, windowText.c_str());
 
-		// Сбрасываем счётчики
+		// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 		frameCnt = 0;
-		timeElapsed += deltaTime;   // или: timeElapsed = totalTime;
+		timeElapsed += deltaTime;   // пїЅпїЅпїЅ: timeElapsed = totalTime;
 	}
 }
 
