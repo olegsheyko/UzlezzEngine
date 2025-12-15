@@ -197,6 +197,9 @@ private:
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mLightingResultSRV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mVelocityBufferSRV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE mTaaHistorySRV[2];
+	CD3DX12_CPU_DESCRIPTOR_HANDLE mLightingResultSRV_CPU;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE mVelocityBufferSRV_CPU;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE mTaaHistorySRV_CPU[2];
 
 	// Terrain system
 	std::unique_ptr<TerrainSystem> m_terrainSystem;
