@@ -19,7 +19,23 @@ using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
 
+
+
 const int gNumFrameResources = 3;
+
+static float Halton(int index, int base)
+{
+	float f = 1.0f, r = 0.0f;
+	while (index > 0) { f /= base; r += f * (index % base); index /= base; }
+	return r;
+}
+
+struct TaaState
+{
+	int HaltonIndex = 1;
+	DirectX::XMFLOAT2 Jitter = { 0.0f, 0.0f };
+	DirectX::XMFLOAT2 PrevJitter = { 0.0f, 0.0f };
+} gTaa;
 
 // Lightweight structure stores parameters to draw a shape.  This will
 // vary from app-to-app.
@@ -73,6 +89,7 @@ public:
     ~TAA_App();
 
     virtual bool Initialize()override;
+	float mTaaJitterPixels = 0.5f;
 
 private:
     virtual void CreateRtvAndDsvDescriptorHeaps()override;
@@ -114,6 +131,10 @@ private:
     CD3DX12_CPU_DESCRIPTOR_HANDLE GetRtv(int index)const;
 
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
+	void ComputeTaaJitter();      // Вычисляет смещение TAA с помощью последовательности Halton и обновляет mJitteredProj
+	void TaaResolvePass();        // Выполняет fullscreen проход разрешения TAA (TAA resolve)
+
+	void CreateTaaResources();
 
 private:
 
@@ -178,6 +199,29 @@ private:
     XMFLOAT3 mRotatedLightDirections[3];
 
     POINT mLastMousePos;
+
+	// TAA
+	Microsoft::WRL::ComPtr<ID3D12Resource> mTaaHistoryA;
+	Microsoft::WRL::ComPtr<ID3D12Resource> mTaaHistoryB;
+	bool mUseHistoryA = true;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE mTaaRTV[2];
+	CD3DX12_GPU_DESCRIPTOR_HANDLE mTaaSRV[2];
+	Microsoft::WRL::ComPtr<ID3D12Resource> mCurrColorCopy;
+	ComPtr<ID3D12PipelineState> mTaaPSO;
+	ComPtr<ID3DBlob> mTaaVS;
+	ComPtr<ID3DBlob> mTaaPS;
+
+	UINT mTaaHeapIndexStart = 0; // t0..t2 ??? TAA
+	bool mTaaEnabled = true;
+	int  mTaaViewMode = 0; // 0..3
+	UINT mTaaHeapIndexStartB = 0;
+
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> mTaaPSOStencil; // PSO для TAA при stencil == 1
+	bool mTaaHistoryValid = false;
+	bool mHasPrevViewProj = false;
+
+	DirectX::XMFLOAT4X4 mJitteredProj = MathHelper::Identity4x4();
 
     // Skull rotation
     RenderItem* mSkullRitem = nullptr;
