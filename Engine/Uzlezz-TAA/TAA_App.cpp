@@ -30,6 +30,16 @@ static float Halton(int index, int base)
 	return r;
 }
 
+static DXGI_FORMAT ToNonSRGB(DXGI_FORMAT fmt)
+{
+	switch (fmt)
+	{
+	case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM;
+	case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return DXGI_FORMAT_B8G8R8A8_UNORM;
+	default: return fmt;
+	}
+}
+
 struct TaaState
 {
 	int HaltonIndex = 1;
@@ -230,12 +240,198 @@ private:
 
 void TAA_App::ComputeTaaJitter()
 {
-	
+	float jx = (Halton(gTaa.HaltonIndex, 2) - 0.5f);
+	float jy = (Halton(gTaa.HaltonIndex, 3) - 0.5f);
+
+	gTaa.HaltonIndex = (gTaa.HaltonIndex%8) + 1;
+
+	XMFLOAT2 jitterUV((jx*mTaaJitterPixels) / max(1, mClientWidth),
+		(jy*mTaaJitterPixels) / max(1, mClientHeight));
+
+	gTaa.PrevJitter = gTaa.Jitter;
+	gTaa.Jitter = jitterUV;
+
+	mCamera.SetLens(0.25f * XM_PI, AspectRatio(), 1.0f, 1000.0f);
+	XMMATRIX proj = mCamera.GetProj();
+	proj.r[2].m128_f32[0] += jitterUV.x * 2.0f;
+	proj.r[2].m128_f32[1] += jitterUV.y * -2.0f;
+	XMStoreFloat4x4(&mJitteredProj, proj);
 }
 
 void TAA_App::TaaResolvePass()
 {
-	
+	// 0) Подготовка ресурсов: текущее/предыдущее цветовые карты и карта глубины
+    //    Для этого используется CopyResource на соответствующие состояния.
+    //
+    if (!mTaaHistoryValid)
+    {
+        auto src = CurrentBackBuffer();
+        auto histA = mTaaHistoryA.Get();
+        auto histB = mTaaHistoryB.Get();
+        auto currCopy = mCurrColorCopy.Get();
+
+        if (src && histA && histB && currCopy)
+        {
+            CD3DX12_RESOURCE_BARRIER preInit[] =
+            {
+                CD3DX12_RESOURCE_BARRIER::Transition(src,
+                    D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE),
+                CD3DX12_RESOURCE_BARRIER::Transition(histA,
+                    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST),
+                CD3DX12_RESOURCE_BARRIER::Transition(histB,
+                    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST),
+                CD3DX12_RESOURCE_BARRIER::Transition(currCopy,
+                    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST),
+            };
+            mCommandList->ResourceBarrier(_countof(preInit), preInit);
+
+            // Копируем текущее состояние в истории A и B
+            mCommandList->CopyResource(histA, src);
+            mCommandList->CopyResource(histB, src);
+            mCommandList->CopyResource(currCopy, src);
+
+            CD3DX12_RESOURCE_BARRIER postInit[] =
+            {
+                CD3DX12_RESOURCE_BARRIER::Transition(src,
+                    D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET),
+                CD3DX12_RESOURCE_BARRIER::Transition(histA,
+                    D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE),
+                CD3DX12_RESOURCE_BARRIER::Transition(histB,
+                    D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE),
+                CD3DX12_RESOURCE_BARRIER::Transition(currCopy,
+                    D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE),
+            };
+            mCommandList->ResourceBarrier(_countof(postInit), postInit);
+
+            mTaaHistoryValid = true;
+            mUseHistoryA = true; // Изначально используем историю из A
+        }
+    }
+
+    //
+    // 1) Сохраняем текущее изображение в mCurrColorCopy
+    //
+    {
+        auto src = CurrentBackBuffer();
+        auto dst = mCurrColorCopy.Get();
+        if (src && dst)
+        {
+            CD3DX12_RESOURCE_BARRIER pre[] =
+            {
+                CD3DX12_RESOURCE_BARRIER::Transition(src,
+                    D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE),
+                CD3DX12_RESOURCE_BARRIER::Transition(dst,
+                    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST)
+            };
+            mCommandList->ResourceBarrier(_countof(pre), pre);
+
+            mCommandList->CopyResource(dst, src);
+
+            CD3DX12_RESOURCE_BARRIER post[] =
+            {
+                CD3DX12_RESOURCE_BARRIER::Transition(src,
+                    D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET),
+                CD3DX12_RESOURCE_BARRIER::Transition(dst,
+                    D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+            };
+            mCommandList->ResourceBarrier(_countof(post), post);
+        }
+    }
+
+    //
+    // 2) Разрешение TAA: ping-pong между историями
+    //    histSrc - текущая история, histDst - следующая история
+    //
+    ID3D12Resource* histSrc = mUseHistoryA ? mTaaHistoryA.Get() : mTaaHistoryB.Get();
+    ID3D12Resource* histDst = mUseHistoryA ? mTaaHistoryB.Get() : mTaaHistoryA.Get();
+
+    //
+    // 3) Настройка SRV для текущего кадра: curr, history, depth
+    //
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC sd = {};
+        sd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        sd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        sd.Texture2D.MipLevels = 1;
+        sd.Texture2D.MostDetailedMip = 0;
+        sd.Texture2D.ResourceMinLODClamp = 0.0f;
+        sd.Format = ToNonSRGB(mBackBufferFormat); // SRV для backbuffer
+
+        // t0: текущее изображение (backbuffer)
+        md3dDevice->CreateShaderResourceView(
+            mCurrColorCopy.Get(), &sd, GetCpuSrv(mTaaHeapIndexStart + 0));
+
+        // t1: история (предыдущее состояние)
+        md3dDevice->CreateShaderResourceView(
+            histSrc, &sd, GetCpuSrv(mTaaHeapIndexStart + 1));
+
+        // t2: depth для SSAO (mSsaoHeapIndexStart+1)
+        md3dDevice->CopyDescriptorsSimple(
+            1,
+            GetCpuSrv(mTaaHeapIndexStart + 2),
+            GetCpuSrv(mSsaoHeapIndexStart + 2),
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+
+    // 4) Полноэкранный TAA resolve шейдер (только для stencil == 1)
+    {
+        mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+
+        auto passCB = mCurrFrameResource->PassCB->Resource();
+        mCommandList->SetGraphicsRootConstantBufferView(
+            1, passCB->GetGPUVirtualAddress());
+
+        // t0..t2 = curr, history, depth
+        mCommandList->SetGraphicsRootDescriptorTable(
+            3, GetGpuSrv(mTaaHeapIndexStart));
+
+        // Настройка RTV и DSV (с учетом stencil)
+        auto rtv = CurrentBackBufferView();
+        auto dsv = DepthStencilView();
+        mCommandList->OMSetRenderTargets(1, &rtv, TRUE, &dsv);
+
+        // Выбор PSO для TAA с учетом stencil
+        mCommandList->SetPipelineState(mTaaPSOStencil.Get());
+
+        // Установка ref = 1, чтобы рисовать только там, где stencil = 1
+        mCommandList->OMSetStencilRef(1);
+
+        mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        mCommandList->DrawInstanced(3, 1, 0, 0);
+    }
+
+
+
+    //
+    // 5) Сохраняем разрешенное изображение в histDst
+    //
+    {
+        auto src = CurrentBackBuffer();
+        auto dst = histDst;
+
+        CD3DX12_RESOURCE_BARRIER pre[] =
+        {
+            CD3DX12_RESOURCE_BARRIER::Transition(src,
+                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE),
+            CD3DX12_RESOURCE_BARRIER::Transition(dst,
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST)
+        };
+        mCommandList->ResourceBarrier(_countof(pre), pre);
+
+        mCommandList->CopyResource(dst, src);
+
+        CD3DX12_RESOURCE_BARRIER post[] =
+        {
+            CD3DX12_RESOURCE_BARRIER::Transition(src,
+                D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET),
+            CD3DX12_RESOURCE_BARRIER::Transition(dst,
+                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+        };
+        mCommandList->ResourceBarrier(_countof(post), post);
+    }
+
+    // Переключаемся на следующую историю
+    mUseHistoryA = !mUseHistoryA;
 }
 
 void TAA_App::CreateTaaResources()
@@ -423,6 +619,8 @@ void TAA_App::Update(const GameTimer& gt)
 	UpdateObjectCBs(gt);
 	UpdateMaterialBuffer(gt);
     UpdateShadowTransform(gt);
+	// TAA
+	ComputeTaaJitter();
 	UpdateMainPassCB(gt);
     UpdateShadowPassCB(gt);
     UpdateSsaoCB(gt);
@@ -533,6 +731,9 @@ void TAA_App::Draw(const GameTimer& gt)
     mCommandList->SetPipelineState(mPSOs["sky"].Get());
     DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Sky]);
 
+	if (mTaaEnabled)
+		TaaResolvePass();
+	
     // Indicate a state transition on the resource usage.
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -601,6 +802,17 @@ void TAA_App::OnKeyboardInput(const GameTimer& gt)
 
 	if(GetAsyncKeyState('D') & 0x8000)
 		mCamera.Strafe(10.0f*dt);
+
+	// === TAA debug controls ===
+	if (GetAsyncKeyState('T') & 0x1)  mTaaEnabled = !mTaaEnabled;                   // ON/OFF
+	if (GetAsyncKeyState('U') & 0x1)  mMainPassCB.TaaFeedback = min(0.99f, mMainPassCB.TaaFeedback + 0.05f); // увеличение feedback
+	if (GetAsyncKeyState('J') & 0x1)  mMainPassCB.TaaFeedback = max(0.0f, mMainPassCB.TaaFeedback - 0.05f); // уменьшение feedback
+
+	// Изменение джиттера TAA (клавиши I/K)
+	if (GetAsyncKeyState('I') & 0x1)  mTaaJitterPixels = min(8.0f, mTaaJitterPixels + 0.5f);
+	if (GetAsyncKeyState('K') & 0x1)  mTaaJitterPixels = max(0.0f, mTaaJitterPixels - 0.5f);
+	if (GetAsyncKeyState('Y') & 0x1)
+		mTaaViewMode = (mTaaViewMode + 1) % 5; // 0..4 (4=DebugSkull)
 
 	mCamera.UpdateViewMatrix();
 }
@@ -722,7 +934,7 @@ void TAA_App::UpdateShadowTransform(const GameTimer& gt)
 void TAA_App::UpdateMainPassCB(const GameTimer& gt)
 {
 	XMMATRIX view = mCamera.GetView();
-	XMMATRIX proj = mCamera.GetProj();
+	XMMATRIX proj = XMLoadFloat4x4(&mJitteredProj);
 
 	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
 	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
@@ -738,6 +950,15 @@ void TAA_App::UpdateMainPassCB(const GameTimer& gt)
 
     XMMATRIX viewProjTex = XMMatrixMultiply(viewProj, T);
     XMMATRIX shadowTransform = XMLoadFloat4x4(&mShadowTransform);
+
+	// TAA
+	static XMFLOAT4X4 sPrevViewProj = MathHelper::Identity4x4();
+	if (!mHasPrevViewProj)
+	{
+		XMStoreFloat4x4(&sPrevViewProj, XMMatrixTranspose(viewProj)); // Инициализация: prev = current
+		mHasPrevViewProj = true;
+	}
+	mMainPassCB.PrevViewProj = sPrevViewProj;
 
 	XMStoreFloat4x4(&mMainPassCB.View, XMMatrixTranspose(view));
 	XMStoreFloat4x4(&mMainPassCB.InvView, XMMatrixTranspose(invView));
@@ -761,9 +982,26 @@ void TAA_App::UpdateMainPassCB(const GameTimer& gt)
 	mMainPassCB.Lights[1].Strength = { 0.1f, 0.1f, 0.1f };
 	mMainPassCB.Lights[2].Direction = mRotatedLightDirections[2];
 	mMainPassCB.Lights[2].Strength = { 0.0f, 0.0f, 0.0f };
+
+	// TAA
+	mMainPassCB.Jitter = gTaa.Jitter;
+	mMainPassCB.PrevJitter = gTaa.PrevJitter;
+
+	mMainPassCB.TaaMode = mTaaViewMode;
+	mMainPassCB.TaaEnabledInt = mTaaEnabled ? 1 : 0;
+
+	if (mMainPassCB.TaaFeedback <= 0.0f || mMainPassCB.TaaFeedback > 0.99f)
+		mMainPassCB.TaaFeedback = 0.9f;
+
+	mMainPassCB.TaaFeedback =
+		MathHelper::Clamp(mMainPassCB.TaaFeedback, 0.0f, 0.99f);
+
+	mMainPassCB.TaaDepthThresh = 0.01f;
  
 	auto currPassCB = mCurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, mMainPassCB);
+
+	XMStoreFloat4x4(&sPrevViewProj, XMMatrixTranspose(viewProj));
 }
 
 void TAA_App::UpdateShadowPassCB(const GameTimer& gt)
@@ -997,7 +1235,7 @@ void TAA_App::BuildDescriptorHeaps()
 	// Create the SRV heap.
 	//
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 18;
+	srvHeapDesc.NumDescriptors = 24;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvDescriptorHeap)));
@@ -1114,6 +1352,16 @@ void TAA_App::BuildShadersAndInputLayout()
 	mShaders["skyVS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "VS", "vs_5_1");
 	mShaders["skyPS"] = d3dUtil::CompileShader(L"Shaders\\Sky.hlsl", nullptr, "PS", "ps_5_1");
 
+	//TAA
+	mTaaVS = d3dUtil::CompileShader(L"Shaders\\TaaResolve.hlsl", nullptr, "VS_FullscreenTriangle", "vs_5_1");
+	mTaaPS = d3dUtil::CompileShader(L"Shaders\\TaaResolve.hlsl", nullptr, "PS_TAA", "ps_5_1");
+
+	if (!mTaaVS || !mTaaPS)
+	{
+		// Обработайте ошибку
+		MessageBox(0, L"Failed to compile TAA shaders", L"Error", 0);
+	}
+	
     mInputLayout =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -1547,6 +1795,50 @@ void TAA_App::BuildPSOs()
 		mShaders["skyPS"]->GetBufferSize()
 	};
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&skyPsoDesc, IID_PPV_ARGS(&mPSOs["sky"])));
+
+	// TAA resolve (fullscreen)
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC taaPsoDesc = {};
+	taaPsoDesc.pRootSignature = mRootSignature.Get();
+	taaPsoDesc.VS = { reinterpret_cast<BYTE*>(mTaaVS->GetBufferPointer()), mTaaVS->GetBufferSize() };
+	taaPsoDesc.PS = { reinterpret_cast<BYTE*>(mTaaPS->GetBufferPointer()), mTaaPS->GetBufferSize() };
+	taaPsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	taaPsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	taaPsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	taaPsoDesc.DepthStencilState.DepthEnable = FALSE;
+	taaPsoDesc.SampleMask = UINT_MAX;
+	taaPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	taaPsoDesc.NumRenderTargets = 1;
+	taaPsoDesc.RTVFormats[0] = mBackBufferFormat;
+	taaPsoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
+	taaPsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(
+		&taaPsoDesc, IID_PPV_ARGS(&mTaaPSO)));
+
+	// === TAA ������ ���, ��� stencil == 1 ===
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC taaStencil = {};
+	taaStencil.pRootSignature = mRootSignature.Get();
+	taaStencil.VS = { reinterpret_cast<BYTE*>(mTaaVS->GetBufferPointer()), mTaaVS->GetBufferSize() };
+	taaStencil.PS = { reinterpret_cast<BYTE*>(mTaaPS->GetBufferPointer()), mTaaPS->GetBufferSize() };
+	taaStencil.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	taaStencil.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	taaStencil.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	taaStencil.DepthStencilState.DepthEnable = FALSE;
+	taaStencil.DepthStencilState.StencilEnable = TRUE;
+	taaStencil.DepthStencilState.StencilReadMask = 0xFF;
+	taaStencil.DepthStencilState.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
+	taaStencil.DepthStencilState.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	taaStencil.DepthStencilState.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	taaStencil.DepthStencilState.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	taaStencil.DepthStencilState.BackFace = taaStencil.DepthStencilState.FrontFace;
+	taaStencil.SampleMask = UINT_MAX;
+	taaStencil.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	taaStencil.NumRenderTargets = 1;
+	taaStencil.RTVFormats[0] = mBackBufferFormat;
+	taaStencil.DSVFormat = mDepthStencilFormat;
+	taaStencil.SampleDesc.Count = m4xMsaaState ? 4 : 1;
+	taaStencil.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(
+		&taaStencil, IID_PPV_ARGS(&mTaaPSOStencil)));
 
 }
 

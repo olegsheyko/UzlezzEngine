@@ -40,6 +40,19 @@ struct PassConstants
     // indices [NUM_DIR_LIGHTS+NUM_POINT_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHT+NUM_SPOT_LIGHTS)
     // are spot lights for a maximum of MaxLights per object.
     Light Lights[MaxLights];
+
+	// TAA
+	DirectX::XMFLOAT4X4 PrevViewProj = MathHelper::Identity4x4();
+	DirectX::XMFLOAT2   InvRT = { 0.0f, 0.0f };
+	DirectX::XMFLOAT2   InvRT_dup = { 0.0f, 0.0f };
+
+	DirectX::XMFLOAT2   Jitter = { 0.0f, 0.0f };
+	DirectX::XMFLOAT2   PrevJitter = { 0.0f, 0.0f };
+
+	int                 TaaMode = 0;
+	int                 TaaEnabledInt = 0;
+	float               TaaFeedback = 0.9f;
+	float               TaaDepthThresh = 0.001f;
 };
 
 struct SsaoConstants
