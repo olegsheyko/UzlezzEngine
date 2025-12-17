@@ -228,8 +228,44 @@ private:
     float mSkullRotationAngle = 0.0f;
 };
 
+void TAA_App::ComputeTaaJitter()
+{
+	
+}
+
+void TAA_App::TaaResolvePass()
+{
+	
+}
+
+void TAA_App::CreateTaaResources()
+{
+	auto device = md3dDevice.Get();
+
+	DXGI_FORMAT fmt = mBackBufferFormat;
+	auto makeTex = [&](ComPtr<ID3D12Resource>& tex)
+	{
+		if (mClientWidth == 0 || mClientHeight == 0) return;
+
+		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
+		CD3DX12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Tex2D(
+			fmt, mClientWidth, mClientHeight, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_NONE);
+
+		ThrowIfFailed(device->CreateCommittedResource(
+			&heapProps, D3D12_HEAP_FLAG_NONE, &desc,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr,
+			IID_PPV_ARGS(&tex)));
+	};
+
+	makeTex(mTaaHistoryA);
+	makeTex(mTaaHistoryB);
+	makeTex(mCurrColorCopy);
+
+	mTaaHistoryValid = false;
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
-    PSTR cmdLine, int showCmd)
+                   PSTR cmdLine, int showCmd)
 {
     // Enable run-time memory check for debug builds.
 #if defined(DEBUG) | defined(_DEBUG)
@@ -345,6 +381,10 @@ void TAA_App::OnResize()
         // Resources changed, so need to rebuild descriptors.
         mSsao->RebuildDescriptors(mDepthStencilBuffer.Get());
     }
+
+	// TAA
+	CreateTaaResources();
+	mTaaHistoryValid = false;
 }
 
 void TAA_App::Update(const GameTimer& gt)
@@ -1006,7 +1046,11 @@ void TAA_App::BuildDescriptorHeaps()
     mShadowMapHeapIndex = mSkyTexHeapIndex + 1;
     mSsaoHeapIndexStart = mShadowMapHeapIndex + 1;
     mSsaoAmbientMapIndex = mSsaoHeapIndexStart + 3;
-    mNullCubeSrvIndex = mSsaoHeapIndexStart + 5;
+	// TAA
+	mTaaHeapIndexStart = mSsaoHeapIndexStart + 2;
+	mTaaHeapIndexStartB = mTaaHeapIndexStart + 3;
+	
+    mNullCubeSrvIndex = mTaaHeapIndexStartB + 3;
     mNullTexSrvIndex1 = mNullCubeSrvIndex + 1;
     mNullTexSrvIndex2 = mNullTexSrvIndex1 + 1;
 
@@ -1896,4 +1940,6 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> TAA_App::GetStaticSamplers()
         shadow 
     };
 }
+
+
 
