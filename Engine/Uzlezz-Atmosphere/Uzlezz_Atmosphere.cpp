@@ -182,6 +182,21 @@ private:
     // Skull rotation
     RenderItem* mSkullRitem = nullptr;
     float mSkullRotationAngle = 0.0f;
+
+    // --- Atmosphere adjustable parameters (runtime tweakable via keys) ---
+    float mAtm_SunIntensity = 6.0f;                // default sun intensity
+    float mAtm_Exposure = 2.5f;                    // exposure applied to inscatter
+    float mAtm_BetaMie = 6e-6f;                   // mie scattering coefficient (scalar)
+    DirectX::XMFLOAT3 mAtm_BetaRayleigh = {5.8e-6f, 13.5e-6f, 33.1e-6f}; // rayleigh RGB
+    float mAtm_MieG = 0.76f;                      // mie asymmetry
+    float mAtm_AtmosphereScaleHeight = 8.0f;      // scale height
+
+    // Helper: last time we printed params (to avoid spamming)
+    float mAtm_PrintCooldown = 0.0f;
+
+    // Debug mode for atmosphere: 0=normal,1=inscatter,2=transmittance
+    int mAtm_DebugMode = 0;
+
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
@@ -443,7 +458,7 @@ void Uzlezz_Atmosphere::Draw(const GameTimer& gt)
     mCommandList->SetPipelineState(mPSOs["opaque"].Get());
     DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Opaque]);
 
-    // Debug overlay (AO buffer) removed: do not draw the Debug layer here so
+    // Debug overlay (AO buffer) removed: do not draw the Debug layer here
     // the SSAO ambient map won't be shown in the corner.
 
     mCommandList->SetPipelineState(mPSOs["sky"].Get());
@@ -504,7 +519,7 @@ void Uzlezz_Atmosphere::OnMouseMove(WPARAM btnState, int x, int y)
  
 void Uzlezz_Atmosphere::OnKeyboardInput(const GameTimer& gt)
 {
-	const float dt = gt.DeltaTime();
+    const float dt = gt.DeltaTime();
 
 	if(GetAsyncKeyState('W') & 0x8000)
 		mCamera.Walk(10.0f*dt);
@@ -518,7 +533,116 @@ void Uzlezz_Atmosphere::OnKeyboardInput(const GameTimer& gt)
 	if(GetAsyncKeyState('D') & 0x8000)
 		mCamera.Strafe(10.0f*dt);
 
+	// --- Atmosphere controls ---
+	bool changed = false;
+
+	// Sun intensity: I increase, K decrease
+	if(GetAsyncKeyState('I') & 0x8000)
+	{
+		mAtm_SunIntensity += 4.0f * dt;
+		changed = true;
+	}
+	if(GetAsyncKeyState('K') & 0x8000)
+	{
+		mAtm_SunIntensity = max(0.0f, mAtm_SunIntensity - 4.0f * dt);
+		changed = true;
+	}
+
+	// Exposure: O increase, L decrease
+	if(GetAsyncKeyState('O') & 0x8000)
+	{
+		mAtm_Exposure += 1.0f * dt;
+		changed = true;
+	}
+	if(GetAsyncKeyState('L') & 0x8000)
+	{
+		mAtm_Exposure = max(0.0f, mAtm_Exposure - 1.0f * dt);
+		changed = true;
+	}
+
+	// Mie coefficient: J increase, H decrease (multiplicative step)
+	if(GetAsyncKeyState('J') & 0x8000)
+	{
+		mAtm_BetaMie *= pow(1.05f, dt*60.0f);
+		changed = true;
+	}
+	if(GetAsyncKeyState('H') & 0x8000)
+	{
+		mAtm_BetaMie /= pow(1.05f, dt*60.0f);
+		changed = true;
+	}
+
+	// Rayleigh scale: U increase, Y decrease (scale RGB uniformly)
+	if(GetAsyncKeyState('U') & 0x8000)
+	{
+		mAtm_BetaRayleigh.x *= pow(1.02f, dt*60.0f);
+		mAtm_BetaRayleigh.y *= pow(1.02f, dt*60.0f);
+		mAtm_BetaRayleigh.z *= pow(1.02f, dt*60.0f);
+		changed = true;
+	}
+	if(GetAsyncKeyState('Y') & 0x8000)
+	{
+		mAtm_BetaRayleigh.x /= pow(1.02f, dt*60.0f);
+		mAtm_BetaRayleigh.y /= pow(1.02f, dt*60.0f);
+		mAtm_BetaRayleigh.z /= pow(1.02f, dt*60.0f);
+		changed = true;
+	}
+
+	// Mie g: N increase, M decrease
+	if(GetAsyncKeyState('N') & 0x8000)
+	{
+		mAtm_MieG = min(0.99f, mAtm_MieG + 0.25f * dt);
+		changed = true;
+	}
+	if(GetAsyncKeyState('M') & 0x8000)
+	{
+		mAtm_MieG = max(-0.99f, mAtm_MieG - 0.25f * dt);
+		changed = true;
+	}
+
+	// Scale height: B increase, V decrease
+	if(GetAsyncKeyState('B') & 0x8000)
+	{
+		mAtm_AtmosphereScaleHeight += 1.0f * dt;
+		changed = true;
+	}
+	if(GetAsyncKeyState('V') & 0x8000)
+	{
+		mAtm_AtmosphereScaleHeight = max(0.1f, mAtm_AtmosphereScaleHeight - 1.0f * dt);
+		changed = true;
+	}
+
+	// Toggle debug mode with T key (single press)
+    static bool tWasDown = false;
+    bool tDown = (GetAsyncKeyState('T') & 0x8000) != 0;
+    if (tDown && !tWasDown)
+    {
+        mAtm_DebugMode = (mAtm_DebugMode + 1) % 3;
+        char buf[128];
+        sprintf_s(buf, "Atmos Debug Mode = %d\n", mAtm_DebugMode);
+        OutputDebugStringA(buf);
+        std::cout << buf;
+    }
+    tWasDown = tDown;
+
 	mCamera.UpdateViewMatrix();
+
+	// Print parameters to debug output at most 4 times per second
+	mAtm_PrintCooldown -= dt;
+	if(changed && mAtm_PrintCooldown <= 0.0f)
+	{
+		char buf[256];
+		sprintf_s(buf, "Atmos: SunI=%.3f, Exposure=%.3f, BetaMie=%.6g, BetaR=(%.6g,%.6g,%.6g), MieG=%.3f, ScaleH=%.3f\n",
+			mAtm_SunIntensity,
+			mAtm_Exposure,
+			mAtm_BetaMie,
+			mAtm_BetaRayleigh.x, mAtm_BetaRayleigh.y, mAtm_BetaRayleigh.z,
+			mAtm_MieG,
+			mAtm_AtmosphereScaleHeight);
+		OutputDebugStringA(buf);
+		std::cout << buf;
+		mAtm_PrintCooldown = 0.25f;
+	}
 }
  
 void Uzlezz_Atmosphere::AnimateMaterials(const GameTimer& gt)
@@ -677,7 +801,25 @@ void Uzlezz_Atmosphere::UpdateMainPassCB(const GameTimer& gt)
 	mMainPassCB.Lights[1].Strength = { 0.1f, 0.1f, 0.1f };
 	mMainPassCB.Lights[2].Direction = mRotatedLightDirections[2];
 	mMainPassCB.Lights[2].Strength = { 0.0f, 0.0f, 0.0f };
- 
+
+	// Fill atmosphere params
+	{
+		XMFLOAT3 sunDir = mRotatedLightDirections[0];
+		XMStoreFloat3(&mMainPassCB.SunDirection, XMLoadFloat3(&sunDir));
+		mMainPassCB.SunIntensity = mAtm_SunIntensity; // from runtime variable
+
+		// Rayleigh beta approximations (from runtime variable)
+		mMainPassCB.BetaRayleigh = mAtm_BetaRayleigh;
+		mMainPassCB.BetaMie = mAtm_BetaMie;
+
+		mMainPassCB.MieG = mAtm_MieG;
+		mMainPassCB.AtmosphereScaleHeight = mAtm_AtmosphereScaleHeight; // tunable
+		mMainPassCB.Exposure = mAtm_Exposure;
+		mMainPassCB.AtmospherePad0 = 0.0f;
+
+        mMainPassCB.AtmosphereDebugMode = (float)mAtm_DebugMode;
+	}
+
 	auto currPassCB = mCurrFrameResource->PassCB.get();
 	currPassCB->CopyData(0, mMainPassCB);
 }
@@ -1509,6 +1651,7 @@ void Uzlezz_Atmosphere::BuildMaterials()
     skullMat->FresnelR0 = XMFLOAT3(0.6f, 0.6f, 0.6f);
     skullMat->Roughness = 0.2f;
 
+    // Correct sky material creation (remove stray artifact)
     auto sky = std::make_unique<Material>();
     sky->Name = "sky";
     sky->MatCBIndex = 4;

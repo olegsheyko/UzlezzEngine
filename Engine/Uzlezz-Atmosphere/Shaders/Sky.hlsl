@@ -39,6 +39,23 @@ VertexOut VS(VertexIn vin)
 
 float4 PS(VertexOut pin) : SV_Target
 {
-	return gCubeMap.Sample(gsamLinearWrap, pin.PosL);
-}
+	// Direction for sky lookup is the vertex local position (unit cube/sphere coords)
+	float3 dir = normalize(pin.PosL);
 
+	// Use a smaller far distance to avoid over-accumulation
+	float farDist = 20000.0f; // reduced from 1e5
+	float3 inscatter;
+	float trans;
+	Atmosphere_InscatterAndTransmittance(gEyePosW, dir, farDist, inscatter, trans);
+
+	// Simple reinhard tonemap + slight contrast tweak
+	inscatter = inscatter / (0.5f + inscatter);
+	inscatter = saturate(inscatter * 1.1f);
+
+	// Fallback cubemap (kept but not used by default)
+	float4 env = gCubeMap.Sample(gsamLinearWrap, dir);
+
+	float3 skyColor = inscatter;
+
+	return float4(skyColor, 1.0f);
+}

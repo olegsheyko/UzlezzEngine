@@ -40,6 +40,21 @@ struct PassConstants
     // indices [NUM_DIR_LIGHTS+NUM_POINT_LIGHTS, NUM_DIR_LIGHTS+NUM_POINT_LIGHT+NUM_SPOT_LIGHTS)
     // are spot lights for a maximum of MaxLights per object.
     Light Lights[MaxLights];
+
+    // --- Atmosphere parameters (added) ---
+    DirectX::XMFLOAT3 SunDirection = { 0.0f, 1.0f, 0.0f };
+    float SunIntensity = 1.0f;
+
+    DirectX::XMFLOAT3 BetaRayleigh = { 0.0025f, 0.0055f, 0.014f };
+    float BetaMie = 0.001f;
+
+    float MieG = 0.76f;
+    float AtmosphereScaleHeight = 2.0f;
+    float Exposure = 2.0f;
+    float AtmospherePad0 = 0.0f;
+
+    // Debug: 0 = normal, 1 = show inscatter, 2 = show transmittance
+    float AtmosphereDebugMode = 0.0f;
 };
 
 struct SsaoConstants

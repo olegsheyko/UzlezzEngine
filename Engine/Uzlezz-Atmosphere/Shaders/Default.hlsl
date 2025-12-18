@@ -128,7 +128,31 @@ float4 PS(VertexOut pin) : SV_Target
     // Common convention to take alpha from diffuse albedo.
     litColor.a = diffuseAlbedo.a;
 
-    return litColor;
+    // ------------------ Atmosphere contribution ------------------
+    // Compute view direction from camera to fragment and approximate distance.
+    float3 viewDir = normalize(pin.PosW - gEyePosW);
+
+    // Approximate distance from eye to fragment using length (can be optimized or derived from depth).
+    float dist = length(pin.PosW - gEyePosW);
+
+    float3 inscatter;
+    float transmittance;
+    Atmosphere_InscatterAndTransmittance(gEyePosW, viewDir, dist, inscatter, transmittance);
+
+    // Debug modes
+    if (gAtmosphereDebugMode >= 1.5f)
+    {
+        // Show transmittance as grayscale
+        return float4(transmittance.xxx, 1.0f);
+    }
+    else if (gAtmosphereDebugMode >= 0.5f)
+    {
+        // Show inscatter directly (raw tone-mapped in function)
+        return float4(inscatter, 1.0f);
+    }
+
+    // Modulate surface-lit color by atmospheric transmittance and add inscatter (aerial perspective)
+    float3 finalRgb = litColor.rgb * transmittance + inscatter;
+
+    return float4(finalRgb, litColor.a);
 }
-
-
