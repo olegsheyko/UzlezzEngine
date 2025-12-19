@@ -291,6 +291,8 @@ private:
     float mAtmosphereCleanliness = 0.5f;
     float mAtmosphereIntensity = 2.0f;
     bool mWireframeEnabled = false;
+    // Flag to control whether debug info is shown in the window title. Default: disabled.
+    bool mShowDebugWindowTitle = false;
 };
 
 
@@ -331,6 +333,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 TAA_App::TAA_App(HINSTANCE hInstance)
     : D3DApp(hInstance)
 {
+    // Disable default frame stats in window title; TAA_App controls its own debug title.
+    // Enable default frame stats (fps/mspf) in window title.
+    mShowFrameStats = true;
     // Estimate the scene bounding sphere manually since we know how the scene was constructed.
     // The grid is the "widest object" with a width of 20 and depth of 30.0f, and centered at
     // the world space origin.  In general, you need to loop over every world space vertex
@@ -495,6 +500,9 @@ void TAA_App::Update(const GameTimer& gt)
 
 void TAA_App::UpdateDebugWindowTitle(const GameTimer& gt)
 {
+    // If debug window title is disabled, do nothing.
+    if (!mShowDebugWindowTitle)
+        return;
     std::wostringstream oss;
     oss << std::fixed << std::setprecision(2);
 
@@ -612,19 +620,10 @@ void TAA_App::Draw(const GameTimer& gt)
     // --- ������ ������� (Outline) ---
     if (mSkullRitem)
     {
-        mCommandList->SetPipelineState(mPSOs["skull_outline"].Get());
-
-        UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
-        auto objectCB = mCurrFrameResource->ObjectCB->Resource();
-        auto* ri = mSkullRitem;
-
-        mCommandList->IASetVertexBuffers(0, 1, &ri->Geo->VertexBufferView());
-        mCommandList->IASetIndexBuffer(&ri->Geo->IndexBufferView());
-        mCommandList->IASetPrimitiveTopology(ri->PrimitiveType);
-
-        D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress() + ri->ObjCBIndex * objCBByteSize;
-        mCommandList->SetGraphicsRootConstantBufferView(0, objCBAddress);
-        mCommandList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
+        // Outline rendering is intentionally disabled so the skull uses its original material/color.
+        // Ранее здесь вызывался mPSOs["skull_outline"], что рисовало красный контур вокруг черепа.
+        // Если потребуется вернуть обводку, замените условие на флаг (например mShowSkullOutline) и
+        // восстановите вызов SetPipelineState и DrawIndexedInstanced внутри этого блока.
     }
 
     // Sky
@@ -718,6 +717,9 @@ void TAA_App::OnKeyboardInput(const GameTimer& gt)
         mAtmosphereCleanliness = max(0.0f, mAtmosphereCleanliness - 0.5f * dt);
     if (GetAsyncKeyState('G') & 0x1)
         mWireframeEnabled = !mWireframeEnabled;
+    // Toggle FPS/frame stats display in window title (press 'O')
+    if (GetAsyncKeyState('O') & 0x1)
+        mShowFrameStats = !mShowFrameStats;
     mCamera.UpdateViewMatrix();
 }
 
@@ -1481,7 +1483,7 @@ void TAA_App::BuildShadersAndInputLayout()
 
     mInputLayout =
     {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         { "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -2391,3 +2393,4 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> TAA_App::GetStaticSamplers()
         shadow
     };
 }
+

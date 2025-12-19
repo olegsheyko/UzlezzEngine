@@ -598,12 +598,20 @@ void D3DApp::CalculateFrameStats()
             L"    fpS: " + fpsStr +
             L"   mspf: " + mspfStr;
 
-        SetWindowText(mhMainWnd, windowText.c_str());
+        if (mShowFrameStats)
+        {
+            SetWindowText(mhMainWnd, windowText.c_str());
+        }
+        else
+        {
+            // If frame stats are disabled, ensure base caption remains.
+            SetWindowText(mhMainWnd, mMainWndCaption.c_str());
+        }
 		
-		// Reset for next average.
-		frameCnt = 0;
-		timeElapsed += 1.0f;
-	}
+        	// Reset for next average.
+        	frameCnt = 0;
+        	timeElapsed += 1.0f;
+    }
 }
 
 void D3DApp::LogAdapters()
@@ -680,3 +688,4 @@ void D3DApp::LogOutputDisplayModes(IDXGIOutput* output, DXGI_FORMAT format)
         ::OutputDebugString(text.c_str());
     }
 }
+
